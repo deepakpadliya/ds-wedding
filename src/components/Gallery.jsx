@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, X } from "lucide-react";
 import { GALLERY as ILLUSTRATIONS } from "@/config/weddingDetails";
 import useGallery from "@/hooks/useGallery";
 import Reveal, { SectionHeading } from "./Reveal";
@@ -9,7 +9,12 @@ export default function Gallery() {
   // Uploaded photos (newest first), followed by the illustrated set.
   const uploaded = useGallery();
   const GALLERY = [
-    ...uploaded.map((p) => ({ src: p.url, alt: p.caption || "A moment from the celebration", caption: p.caption })),
+    ...uploaded.map((p) => ({
+      src: p.type === "video" ? p.poster : p.url,
+      video: p.type === "video" ? p.url : null,
+      alt: p.caption || (p.type === "video" ? "A video from the celebration" : "A moment from the celebration"),
+      caption: p.caption,
+    })),
     ...ILLUSTRATIONS,
   ];
   const [idx, setIdx] = useState(-1);
@@ -37,15 +42,26 @@ export default function Gallery() {
               key={`${g.src}-${i}`}
               data-testid={`gallery-item-${i}`}
               onClick={() => setIdx(i)}
-              className="group mb-4 block w-full break-inside-avoid overflow-hidden rounded-xl border border-gold/30"
+              className="group relative mb-4 block w-full break-inside-avoid overflow-hidden rounded-xl border border-gold/30"
               aria-label={`Open image: ${g.alt}`}
             >
-              <img
-                src={g.src}
-                alt={g.alt}
-                loading="lazy"
-                className="w-full object-cover transition-transform duration-700 group-hover:scale-105"
-              />
+              {g.video && !g.src ? (
+                <video src={g.video} preload="metadata" muted playsInline className="aspect-video w-full bg-maroon-deep object-cover" />
+              ) : (
+                <img
+                  src={g.src}
+                  alt={g.alt}
+                  loading="lazy"
+                  className="w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+              )}
+              {g.video && (
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="rounded-full bg-maroon/80 p-3.5 text-ivory shadow-lg transition-transform group-hover:scale-110">
+                    <Play className="h-6 w-6 fill-current" />
+                  </span>
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -68,11 +84,23 @@ export default function Gallery() {
               exit={{ opacity: 0, scale: 0.96 }}
               transition={{ duration: 0.3 }}
             >
-              <img
-                src={GALLERY[idx].src}
-                alt={GALLERY[idx].alt}
-                className="max-h-[78vh] w-auto rounded-xl border border-gold/40 object-contain shadow-2xl"
-              />
+              {GALLERY[idx].video ? (
+                <video
+                  key={GALLERY[idx].video}
+                  src={GALLERY[idx].video}
+                  poster={GALLERY[idx].src || undefined}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="max-h-[78vh] w-auto max-w-full rounded-xl border border-gold/40 bg-black shadow-2xl"
+                />
+              ) : (
+                <img
+                  src={GALLERY[idx].src}
+                  alt={GALLERY[idx].alt}
+                  className="max-h-[78vh] w-auto rounded-xl border border-gold/40 object-contain shadow-2xl"
+                />
+              )}
               {GALLERY[idx].caption && <p className="mt-3 text-center text-sm text-ivory/80">{GALLERY[idx].caption}</p>}
             </motion.div>
             <button

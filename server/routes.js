@@ -6,11 +6,25 @@ import { requireAdmin, setAuthCookies, clearAuthCookies, verifyPassword, decodeR
 
 const guests = () => db.collection("wedding_guests");
 const photos = () => db.collection("gallery_photos");
-const photoOut = (d) => ({
-  id: d.id, caption: d.caption || null, width: d.width || null, height: d.height || null,
-  createdAt: d.createdAt instanceof Date ? d.createdAt.toISOString() : d.createdAt,
-  url: `/api/v1/gallery/${d.id}/image`,
-});
+const VIDEO_MAX = 10 * 1024 * 1024; // 10 MB per video
+const CHUNK = 2 * 1024 * 1024;      // videos are uploaded/stored in 2 MB pieces (Vercel rejects bodies over 4.5 MB)
+const RANGE_CAP = 3 * 1024 * 1024;  // never answer one request with more than this
+const chunks = () => db.collection("gallery_video_chunks");
+const photoOut = (d) => {
+  const video = d.type === "video";
+  return {
+    id: d.id, type: video ? "video" : "image", caption: d.caption || null, width: d.width || null, height: d.height || null,
+    size: d.size || null,
+    createdAt: d.createdAt instanceof Date ? d.createdAt.toISOString() : d.createdAt,
+    url: `/api/v1/gallery/${d.id}/${video ? "video" : "image"}`,
+    poster: video && d.hasPoster ? `/api/v1/gallery/${d.id}/image` : null,
+  };
+};
+const sniffVideo = (b) => {
+  if (b.length > 12 && b.subarray(4, 8).toString() === "ftyp") return b.subarray(8, 12).toString() === "qt  " ? "video/quicktime" : "video/mp4";
+  if (b.length > 4 && b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return "video/webm";
+  return null;
+};
 // Identify the real image type from its first bytes (don't trust the Content-Type header alone).
 const sniffImage = (b) => {
   if (b.length > 12 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
@@ -60,15 +74,42 @@ router.get("/v1/contacts", wrap(async (_req, res) => res.json({ contacts: await 
 
 // Gallery: newest uploads first. Image bytes are served from MongoDB, cached hard (ids never change).
 router.get("/v1/gallery", wrap(async (_req, res) => {
-  const docs = await photos().find({}, { projection: { _id: 0, data: 0 } }).sort({ createdAt: -1 }).toArray();
+  const docs = await photos().find({ status: { $ne: "uploading" } }, { projection: { _id: 0, data: 0, poster: 0 } }).sort({ createdAt: -1 }).toArray();
   res.json({ photos: docs.map(photoOut) });
 }));
 
 router.get("/v1/gallery/:id/image", wrap(async (req, res) => {
-  const doc = await photos().findOne({ id: req.params.id }, { projection: { _id: 0, data: 1, contentType: 1 } });
-  if (!doc) throw new HttpError(404, "Photo not found");
-  res.set({ "Content-Type": doc.contentType, "Cache-Control": "public, max-age=31536000, immutable" });
-  res.send(Buffer.from(doc.data.buffer));
+  const doc = await photos().findOne({ id: req.params.id, status: { $ne: "uploading" } }, { projection: { _id: 0, data: 1, poster: 1, type: 1, contentType: 1 } });
+  const bin = doc && (doc.type === "video" ? doc.poster : doc.data);
+  if (!bin) throw new HttpError(404, "Photo not found");
+  res.set({ "Content-Type": doc.type === "video" ? "image/jpeg" : doc.contentType, "Cache-Control": "public, max-age=31536000, immutable" });
+  res.send(Buffer.from(bin.buffer));
+}));
+
+// Videos are streamed with HTTP Range support, in slices small enough for serverless response limits.
+router.get("/v1/gallery/:id/video", wrap(async (req, res) => {
+  const doc = await photos().findOne({ id: req.params.id, type: "video", status: "ready" }, { projection: { _id: 0, size: 1, contentType: 1 } });
+  if (!doc) throw new HttpError(404, "Video not found");
+  const size = doc.size;
+  let start = 0, end = size - 1;
+  const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || "");
+  if (m && (m[1] || m[2])) {
+    if (m[1] === "") start = Math.max(0, size - parseInt(m[2], 10));
+    else { start = parseInt(m[1], 10); if (m[2]) end = Math.min(end, parseInt(m[2], 10)); }
+    if (start > end || start >= size) return res.status(416).set("Content-Range", `bytes */${size}`).end();
+  }
+  const capped = Math.min(end, start + RANGE_CAP - 1);
+  const partial = capped < size - 1 || start > 0;
+  end = capped;
+  const first = Math.floor(start / CHUNK), last = Math.floor(end / CHUNK);
+  const parts = await chunks().find({ videoId: req.params.id, index: { $gte: first, $lte: last } }).sort({ index: 1 }).toArray();
+  const buf = Buffer.concat(parts.map((c) => Buffer.from(c.data.buffer))).subarray(start - first * CHUNK, end - first * CHUNK + 1);
+  res.status(partial ? 206 : 200).set({
+    "Content-Type": doc.contentType, "Accept-Ranges": "bytes", "Content-Length": buf.length,
+    "Cache-Control": "public, max-age=31536000, immutable",
+    ...(partial && { "Content-Range": `bytes ${start}-${start + buf.length - 1}/${size}` }),
+  });
+  res.end(buf);
 }));
 
 router.post("/v1/rsvp", rateLimit("rsvp", 8, 60), wrap(async (req, res) => {
@@ -153,6 +194,57 @@ admin.post("/gallery", express.raw({ type: ["image/jpeg", "image/png", "image/we
   res.status(201).json(photoOut(doc));
 }));
 
+// ---- video upload: init -> chunks (2 MB each) -> optional poster -> complete
+const dropVideo = async (id) => { await chunks().deleteMany({ videoId: id }); await photos().deleteOne({ id }); };
+
+admin.post("/gallery/video/init", wrap(async (req, res) => {
+  const size = parseInt(req.body?.size, 10);
+  if (!(size > 0)) throw new HttpError(422, "Video size is required");
+  if (size > VIDEO_MAX) throw new HttpError(413, "Videos must be under 10 MB");
+  const { caption } = parse(galleryCaption, { caption: req.body?.caption });
+  const stale = await photos().find({ status: "uploading", createdAt: { $lt: new Date(Date.now() - 3600_000) } }, { projection: { id: 1 } }).toArray();
+  for (const d of stale) await dropVideo(d.id); // abandoned uploads
+  const dim = (v) => { const n = parseInt(v, 10); return n > 0 && n < 20000 ? n : null; };
+  const doc = { id: crypto.randomUUID(), type: "video", status: "uploading", size, caption, contentType: null, hasPoster: false,
+    width: dim(req.body?.w), height: dim(req.body?.h), chunksTotal: Math.ceil(size / CHUNK), createdAt: new Date() };
+  await photos().insertOne(doc);
+  res.status(201).json({ id: doc.id, chunkSize: CHUNK, chunks: doc.chunksTotal });
+}));
+
+admin.put("/gallery/video/:id/chunks/:i", express.raw({ type: "application/octet-stream", limit: "3mb" }), wrap(async (req, res) => {
+  const doc = await photos().findOne({ id: req.params.id, status: "uploading" });
+  if (!doc) throw new HttpError(404, "Upload not found");
+  const i = parseInt(req.params.i, 10), buf = req.body;
+  if (!(i >= 0 && i < doc.chunksTotal)) throw new HttpError(422, "Bad chunk number");
+  const expected = i < doc.chunksTotal - 1 ? CHUNK : doc.size - CHUNK * (doc.chunksTotal - 1);
+  if (!Buffer.isBuffer(buf) || buf.length !== expected) throw new HttpError(422, "Chunk size does not match the declared video size");
+  if (i === 0) {
+    const contentType = sniffVideo(buf);
+    if (!contentType) { await dropVideo(doc.id); throw new HttpError(422, "Only MP4, MOV or WebM videos are allowed"); }
+    await photos().updateOne({ id: doc.id }, { $set: { contentType } });
+  }
+  await chunks().updateOne({ videoId: doc.id, index: i }, { $set: { data: buf } }, { upsert: true });
+  res.json({ ok: true, index: i });
+}));
+
+admin.put("/gallery/video/:id/poster", express.raw({ type: "image/jpeg", limit: "1mb" }), wrap(async (req, res) => {
+  const buf = req.body;
+  if (!Buffer.isBuffer(buf) || sniffImage(buf) !== "image/jpeg") throw new HttpError(422, "Poster must be a JPEG image");
+  const r = await photos().updateOne({ id: req.params.id, type: "video" }, { $set: { poster: buf, hasPoster: true } });
+  if (!r.matchedCount) throw new HttpError(404, "Video not found");
+  res.json({ ok: true });
+}));
+
+admin.post("/gallery/video/:id/complete", wrap(async (req, res) => {
+  const doc = await photos().findOne({ id: req.params.id, status: "uploading" }, { projection: { _id: 0, poster: 0 } });
+  if (!doc) throw new HttpError(404, "Upload not found");
+  const got = await chunks().countDocuments({ videoId: doc.id });
+  if (got !== doc.chunksTotal || !doc.contentType) throw new HttpError(422, `Upload incomplete (${got} of ${doc.chunksTotal} parts received)`);
+  const createdAt = new Date();
+  await photos().updateOne({ id: doc.id }, { $set: { status: "ready", createdAt } });
+  res.json(photoOut({ ...doc, createdAt }));
+}));
+
 admin.patch("/gallery/:id", wrap(async (req, res) => {
   const { caption } = parse(galleryCaption, req.body);
   const doc = await photos().findOneAndUpdate({ id: req.params.id }, { $set: { caption: caption ?? null } }, { returnDocument: "after", projection: { _id: 0, data: 0 } });
@@ -163,6 +255,7 @@ admin.patch("/gallery/:id", wrap(async (req, res) => {
 admin.delete("/gallery/:id", wrap(async (req, res) => {
   const r = await photos().deleteOne({ id: req.params.id });
   if (!r.deletedCount) throw new HttpError(404, "Photo not found");
+  await chunks().deleteMany({ videoId: req.params.id });
   res.json({ ok: true, deleted: req.params.id });
 }));
 

@@ -14,6 +14,7 @@ export async function ensureIndexes() {
     ["wedding_settings", { key: 1 }, { name: "settings_key_unique", unique: true }],
     ["gallery_photos", { id: 1 }, { name: "photo_id_unique", unique: true }],
     ["gallery_photos", { createdAt: -1 }, { name: "photo_created_desc" }],
+    ["gallery_video_chunks", { videoId: 1, index: 1 }, { name: "video_chunk_unique", unique: true }],
     ["admin_users", { email: 1 }, { name: "email_unique", unique: true }],
     ["login_attempts", { expiresAt: 1 }, { name: "expires_at_ttl", expireAfterSeconds: 0 }],
   ];

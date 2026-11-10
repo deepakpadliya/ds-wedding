@@ -21,3 +21,46 @@ export async function compressImage(file, { maxSide = 1800, quality = 0.85 } = {
   if (!blob) throw new Error(`"${file.name}" could not be processed`);
   return { blob, width: w, height: h };
 }
+
+export const VIDEO_MAX_BYTES = 10 * 1024 * 1024;
+export const VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
+
+// Grabs a still frame from a video file to use as its thumbnail. Resolves null if the browser can't decode it.
+export function videoPoster(file, maxSide = 800) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    const done = (v) => {
+      URL.revokeObjectURL(url);
+      video.removeAttribute("src");
+      resolve(v);
+    };
+    const timer = setTimeout(() => done(null), 8000);
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.onerror = () => {
+      clearTimeout(timer);
+      done(null);
+    };
+    video.onloadeddata = () => {
+      video.currentTime = Math.min(0.2, (video.duration || 1) / 2);
+    };
+    video.onseeked = () => {
+      const scale = Math.min(1, maxSide / Math.max(video.videoWidth, video.videoHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => {
+          clearTimeout(timer);
+          done(blob ? { blob, width: video.videoWidth, height: video.videoHeight } : null);
+        },
+        "image/jpeg",
+        0.8
+      );
+    };
+    video.src = url;
+  });
+}
