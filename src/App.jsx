@@ -1,5 +1,5 @@
 import { Component, useEffect } from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Lenis from "lenis";
 import "lenis/dist/lenis.css";
 import "@/App.css";
@@ -53,6 +53,10 @@ function SmoothScroll() {
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
+    // Always open at the top (Hero) — don't let the browser restore an old scroll position on reload.
+    if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
+  }, []);
+  useEffect(() => {
     if (window.__lenis) window.__lenis.scrollTo(0, { immediate: true });
     else window.scrollTo(0, 0);
   }, [pathname]);
@@ -66,9 +70,12 @@ export default function App() {
         <SmoothScroll />
         <ScrollToTop />
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Navigate to="/groom" replace />} />
+          <Route path="/all" element={<Home key="all" />} />
+          <Route path="/bride" element={<Home key="bride" side="bride" />} />
+          <Route path="/groom" element={<Home key="groom" side="groom" />} />
           <Route path="/admin" element={<Admin />} />
-          <Route path="*" element={<Home />} />
+          <Route path="*" element={<Navigate to="/groom" replace />} />
         </Routes>
         <Toaster position="top-center" richColors />
       </BrowserRouter>

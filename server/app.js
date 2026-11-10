@@ -20,6 +20,7 @@ export const init = () => (ready ??= (async () => {
 
 const apiErrors = (err, _req, res, _next) => {
   if (err instanceof HttpError) return res.status(err.status).json({ detail: err.detail, ...err.extra });
+  if (err.type === "entity.too.large") return res.status(413).json({ detail: "That file is too large (max 4 MB)" });
   if (err.type === "entity.parse.failed") return res.status(422).json({ detail: "Invalid JSON body" });
   console.error(err);
   res.status(500).json({ detail: "Internal Server Error" });

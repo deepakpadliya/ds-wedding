@@ -1,3 +1,4 @@
+import { SideProvider } from "@/context/SideContext";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Marquee from "@/components/Marquee";
@@ -11,8 +12,9 @@ import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
 import MusicToggle from "@/components/MusicToggle";
 
-export default function Home() {
+export default function Home({ side = null }) {
   return (
+    <SideProvider value={side}>
     <main className="relative bg-ivory">
       <Navbar />
       <Hero />
@@ -27,5 +29,6 @@ export default function Home() {
       <Footer />
       <MusicToggle />
     </main>
+    </SideProvider>
   );
 }

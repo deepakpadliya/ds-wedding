@@ -2,6 +2,21 @@
 // CENTRAL WEDDING CONFIGURATION — edit everything about the wedding here.
 // ============================================================================
 
+// Lal Bagh Google Maps link used for all "Get Directions" buttons.
+const LAL_BAGH_MAP = "https://maps.app.goo.gl/T49iE25c5xiY3xfx9";
+// Family residence — start point for Dev Darshan and Var Nikasi.
+const RESIDENCE_MAP = "24.030031,74.775350";
+
+// Ready-made maps URL -> used as is. "lat,lng" -> directions with that destination.
+// Anything else -> Google Maps search for the text.
+export const mapLink = (q) => {
+  if (/^https?:\/\//.test(q)) return q;
+  const enc = encodeURIComponent(q);
+  return /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(q.trim())
+    ? `https://www.google.com/maps/dir/?api=1&destination=${enc}`
+    : `https://www.google.com/maps/search/?api=1&query=${enc}`;
+};
+
 export const GROOM = {
   name: "Deepak Padliya",
   father: "Kailash Ji Padliya",
@@ -26,13 +41,15 @@ export const WEDDING = {
   mainVenue: "Lal Bagh, Pratapgarh, Rajasthan",
   locationShort: "Pratapgarh, Rajasthan",
   // Optional background music (off by default; toggle in the corner)
-  musicUrl: "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
+  musicUrl: "/LONDON%20THUMAKDA.m4a",
   contacts: [
     { number: "8742005204", label: "Wedding Enquiries & Assistance" },
     { number: "9828844627", label: "Wedding Enquiries & Assistance" },
   ],
-  whatsappNumber: (num) => `https://wa.me/91${num}`,
-  telNumber: (num) => `tel:+91${num}`,
+  // Numbers are 10-digit Indian mobiles, or international with a leading "+".
+  displayNumber: (num) => (num.startsWith("+") ? num : num.length === 10 ? `+91 ${num}` : `+${num}`),
+  whatsappNumber: (num) => `https://wa.me/${num.startsWith("+") ? num.slice(1) : num.length === 10 ? `91${num}` : num}`,
+  telNumber: (num) => `tel:${num.startsWith("+") ? num : num.length === 10 ? `+91${num}` : `+${num}`}`,
 };
 
 export const INVITATION = {
@@ -74,7 +91,7 @@ export const EVENTS = [
     description:
       "An afternoon filled with beautiful mehendi, colours, music, laughter, and celebration.",
     image: "/images/events/mehandi.png",
-    mapQuery: "Lal Bagh, Pratapgarh, Rajasthan",
+    mapQuery: LAL_BAGH_MAP,
   },
   {
     id: "dev-darshan",
@@ -85,7 +102,7 @@ export const EVENTS = [
     venue: "At Residence",
     description: "Begin the day with devotion, blessings, and auspicious rituals.",
     image: "/images/events/dev-darshan.png",
-    mapQuery: null,
+    mapQuery: RESIDENCE_MAP,
   },
   {
     id: "vanak-haldi",
@@ -97,7 +114,7 @@ export const EVENTS = [
     description:
       "A joyful celebration filled with turmeric, flowers, family traditions, and happiness.",
     image: "/images/events/vanak-haldi.png",
-    mapQuery: "Lal Bagh, Pratapgarh, Rajasthan",
+    mapQuery: LAL_BAGH_MAP,
   },
   {
     id: "mamera",
@@ -109,7 +126,7 @@ export const EVENTS = [
     description:
       "Celebrate the beautiful Rajasthani family tradition of Mamera with blessings, gifts, and togetherness.",
     image: "/images/events/mamera.png",
-    mapQuery: "Lal Bagh, Pratapgarh, Rajasthan",
+    mapQuery: LAL_BAGH_MAP,
   },
   {
     id: "dj-night",
@@ -121,7 +138,7 @@ export const EVENTS = [
     description:
       "An energetic evening of music, dance, celebration, and unforgettable memories.",
     image: "/images/events/dj-night.png",
-    mapQuery: "Lal Bagh, Pratapgarh, Rajasthan",
+    mapQuery: LAL_BAGH_MAP,
   },
   {
     id: "var-nikasi",
@@ -133,7 +150,7 @@ export const EVENTS = [
     description:
       "A royal wedding procession marking the beginning of the groom's journey towards the wedding celebrations.",
     image: "/images/events/var-nikasi.png",
-    mapQuery: null,
+    mapQuery: RESIDENCE_MAP,
   },
   {
     id: "shubh-lagna",
@@ -145,7 +162,7 @@ export const EVENTS = [
     description:
       "The most special moment — two souls coming together to begin their forever journey.",
     image: "/images/events/shubh-lagna.png",
-    mapQuery: "Lal Bagh, Pratapgarh, Rajasthan",
+    mapQuery: LAL_BAGH_MAP,
   },
   {
     id: "reception",
@@ -157,7 +174,7 @@ export const EVENTS = [
     description:
       "An evening of celebration, blessings and warm hospitality as family and friends felicitate the newlyweds.",
     image: "/images/events/reception.png",
-    mapQuery: "Lal Bagh, Pratapgarh, Rajasthan",
+    mapQuery: LAL_BAGH_MAP,
   },
 ];
 
@@ -168,19 +185,19 @@ export const GALLERY = [
   { src: "/images/groom.png", alt: "Illustrated portrait of the groom Deepak in an ivory sherwani" },
 ];
 
-// Personal memories are intentionally left as editable placeholders.
+// Story copy — edit these lines any time to add your own memories.
 export const STORY = {
-  intro: "[Write a short introduction to Deepak and Shruti here — replace this placeholder with your own words.]",
+  intro: "Two hearts, two families, one beautiful beginning. Deepak and Shruti are ready to begin a lifetime of togetherness — and they cannot wait to share every moment of it with the people they love most.",
   timeline: [
     {
       title: "The First Hello",
       label: "Where it all began",
-      text: "[Add how the couple first met — replace this placeholder with your memory.]",
+      text: "Some meetings feel like they were written in the stars. One hello, one smile — and two lives quietly began to turn towards each other.",
     },
     {
       title: "The Engagement",
       label: "A promise made",
-      text: "[Add your engagement story and date — replace this placeholder with your memory.]",
+      text: "With the blessings of both families, a promise was made — to walk together through every season of life, hand in hand.",
     },
     {
       title: "Wedding Bells",
@@ -197,27 +214,29 @@ export const TRAVEL = {
     {
       name: "Lal Bagh",
       note: "Main wedding venue — Mehendi, Haldi, Mamera, DJ Night & the Wedding Ceremony",
-      mapQuery: "Lal Bagh, Pratapgarh, Rajasthan",
+      mapQuery: LAL_BAGH_MAP,
     },
     {
       name: "Bhaiji Ka Mandir, Gacha Gali",
+      hideForBride: true, // not shown on the /bride page
       note: "Shanti Vidhan & Pujan",
       mapQuery: "Bhaiji Ka Mandir, Gacha Gali, Pratapgarh, Rajasthan",
     },
     {
       name: "At Residence",
-      note: "Dev Darshan & Var Nikasi — private family residence",
-      mapQuery: null,
+      hideForBride: true, // not shown on the /bride page
+      note: "Dev Darshan & Var Nikasi — the baraat begins from our family residence",
+      mapQuery: RESIDENCE_MAP,
     },
   ],
   guidance: [
     {
       title: "Getting There",
-      text: "[Add travel guidance here — nearest railway station, airport and roads. Replace this placeholder.]",
+      text: "Pratapgarh is easy to reach by road, and our families will happily help you plan your journey. Call us on the numbers below and we will guide you with routes and timings — just come with a happy heart, we will take care of the rest.",
     },
     {
       title: "Where to Stay",
-      text: "[Add hotel and accommodation suggestions here. Replace this placeholder.]",
+      text: "Your comfort is our joy. Tick “accommodation assistance” in the RSVP and our families will arrange a warm, welcoming place for you to rest between the celebrations.",
     },
   ],
 };

@@ -1,17 +1,20 @@
 import { Bus, Home, Hotel, MapPin, Navigation } from "lucide-react";
-import { TRAVEL } from "@/config/weddingDetails";
+import { TRAVEL, mapLink } from "@/config/weddingDetails";
+import { useSide } from "@/context/SideContext";
 import Reveal, { SectionHeading } from "./Reveal";
 
 const ICONS = [MapPin, MapPin, Home];
 
 export default function VenueTravel() {
+  const side = useSide();
+  const venues = TRAVEL.venues.filter((v) => !(side === "bride" && v.hideForBride));
   return (
     <section id="venue" data-testid="venue-section" className="section-pad scroll-mt-20 bg-ivory">
       <div className="wrap">
         <SectionHeading eyebrow="Venue & Travel" title="Where the Celebration Unfolds" script="pratapgarh awaits you" />
 
-        <div className="grid gap-6 md:grid-cols-3">
-          {TRAVEL.venues.map((v, i) => {
+        <div className={`grid gap-6 ${venues.length === 1 ? "mx-auto max-w-md" : "md:grid-cols-3"}`}>
+          {venues.map((v, i) => {
             const Icon = ICONS[i] || MapPin;
             return (
               <Reveal key={v.name} delay={i * 0.1} className="h-full">
@@ -24,7 +27,7 @@ export default function VenueTravel() {
                   {v.mapQuery ? (
                     <a
                       data-testid={`venue-directions-${i}`}
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.mapQuery)}`}
+                      href={mapLink(v.mapQuery)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn-outline mt-5 !py-2.5 text-xs"
@@ -51,7 +54,7 @@ export default function VenueTravel() {
                   <p className="flex items-center gap-2.5 font-display text-lg font-semibold text-maroon">
                     <Icon className="h-5 w-5 text-gold-deep" /> {g.title}
                   </p>
-                  <p className="mt-2.5 text-sm italic text-brown/55">{g.text}</p>
+                  <p className="mt-2.5 text-sm text-brown/75">{g.text}</p>
                 </div>
               </Reveal>
             );

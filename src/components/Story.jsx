@@ -1,4 +1,3 @@
-import { Pencil } from "lucide-react";
 import Reveal, { SectionHeading } from "./Reveal";
 import { BRIDE, GROOM, STORY } from "@/config/weddingDetails";
 
@@ -58,14 +57,7 @@ export default function Story() {
                   <div data-testid={`story-timeline-${i}`} className="card-royal p-6">
                     <p className="eyebrow">{item.label}</p>
                     <h3 className="mt-2 font-display text-xl font-semibold text-maroon">{item.title}</h3>
-                    {item.text.startsWith("[") ? (
-                      <p className="mt-2 flex items-start gap-2 rounded-lg border border-dashed border-gold/50 bg-gold/5 px-3 py-2.5 text-sm italic text-brown/55">
-                        <Pencil className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-deep" />
-                        {item.text}
-                      </p>
-                    ) : (
-                      <p className="mt-2 text-sm text-brown/75">{item.text}</p>
-                    )}
+                    <p className="mt-2 text-sm text-brown/75">{item.text}</p>
                   </div>
                 </Reveal>
               </li>

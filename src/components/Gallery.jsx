@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { GALLERY } from "@/config/weddingDetails";
+import { GALLERY as ILLUSTRATIONS } from "@/config/weddingDetails";
+import useGallery from "@/hooks/useGallery";
 import Reveal, { SectionHeading } from "./Reveal";
 
 export default function Gallery() {
+  // Uploaded photos (newest first), followed by the illustrated set.
+  const uploaded = useGallery();
+  const GALLERY = [
+    ...uploaded.map((p) => ({ src: p.url, alt: p.caption || "A moment from the celebration", caption: p.caption })),
+    ...ILLUSTRATIONS,
+  ];
   const [idx, setIdx] = useState(-1);
   const open = idx >= 0;
 
@@ -66,7 +73,7 @@ export default function Gallery() {
                 alt={GALLERY[idx].alt}
                 className="max-h-[78vh] w-auto rounded-xl border border-gold/40 object-contain shadow-2xl"
               />
-              <p className="mt-3 text-center text-sm text-ivory/80">{GALLERY[idx].alt}</p>
+              {GALLERY[idx].caption && <p className="mt-3 text-center text-sm text-ivory/80">{GALLERY[idx].caption}</p>}
             </motion.div>
             <button
               data-testid="gallery-lightbox-close"

@@ -3,7 +3,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Download, LogOut, Pencil, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import api, { getErrorMessage } from "@/lib/api";
-import { EVENTS } from "@/config/weddingDetails";
+import useEvents from "@/hooks/useEvents";
+import EventSettings from "@/components/admin/EventSettings";
+import ContactSettings from "@/components/admin/ContactSettings";
+import GallerySettings from "@/components/admin/GallerySettings";
 import { Monogram } from "@/components/Ornaments";
 
 const STATUS_BADGE = {
@@ -11,6 +14,7 @@ const STATUS_BADGE = {
   no: "border-red-200 bg-red-50 text-red-700",
   maybe: "border-amber-200 bg-amber-50 text-amber-700",
 };
+const SIDE_NAME = { bride: "Bride", groom: "Groom" };
 const STATUS_LABEL = { yes: "Attending", no: "Not attending", maybe: "Maybe" };
 
 function StatCard({ label, value, testId }) {
@@ -23,6 +27,7 @@ function StatCard({ label, value, testId }) {
 }
 
 function GuestForm({ initial, onSave, onClose, saving }) {
+  const EVENTS = useEvents({ includeHidden: true });
   const [form, setForm] = useState(initial);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const toggleEvent = (id) =>
@@ -60,6 +65,14 @@ function GuestForm({ initial, onSave, onClose, saving }) {
               <option value="yes">Attending</option>
               <option value="maybe">Maybe</option>
               <option value="no">Not attending</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium uppercase tracking-wider text-brown/70">Side</span>
+            <select data-testid="guest-edit-side" className="input-royal mt-1.5" value={form.side || ""} onChange={(e) => set("side", e.target.value)}>
+              <option value="">Not specified</option>
+              <option value="bride">Bride</option>
+              <option value="groom">Groom</option>
             </select>
           </label>
           <label className="block">
@@ -111,6 +124,7 @@ export default function AdminDashboard({ onLogout }) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [side, setSide] = useState("");
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -123,7 +137,7 @@ export default function AdminDashboard({ onLogout }) {
         const [s, g] = await Promise.all([
           api.get("/v1/admin/dashboard"),
           api.get("/v1/admin/guests", {
-            params: { page: opts.page ?? page, limit: 10, search: opts.search ?? search, status: opts.status ?? status },
+            params: { page: opts.page ?? page, limit: 10, search: opts.search ?? search, status: opts.status ?? status, side: opts.side ?? side },
           }),
         ]);
         setStats(s.data);
@@ -134,7 +148,7 @@ export default function AdminDashboard({ onLogout }) {
         setLoading(false);
       }
     },
-    [page, search, status]
+    [page, search, status, side]
   );
 
   useEffect(() => {
@@ -155,6 +169,12 @@ export default function AdminDashboard({ onLogout }) {
     setStatus(v);
     setPage(1);
     load({ status: v, page: 1 });
+  };
+
+  const onSide = (v) => {
+    setSide(v);
+    setPage(1);
+    load({ side: v, page: 1 });
   };
 
   const gotoPage = (p) => {
@@ -234,13 +254,15 @@ export default function AdminDashboard({ onLogout }) {
           <p className="py-24 text-center font-script text-3xl text-gold-deep">Loading the guest book…</p>
         ) : (
           <>
-            <section className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+            <section className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
               <StatCard testId="stat-total-rsvps" label="Total RSVPs" value={stats.totalRsvps} />
               <StatCard testId="stat-attending" label="Attending" value={stats.attending} />
               <StatCard testId="stat-not-attending" label="Not Attending" value={stats.notAttending} />
               <StatCard testId="stat-maybe" label="Maybe" value={stats.maybe} />
               <StatCard testId="stat-expected-attendees" label="Expected Guests" value={stats.totalExpectedAttendees} />
               <StatCard testId="stat-accommodation" label="Accommodation" value={stats.accommodationRequired} />
+              <StatCard testId="stat-bride-side" label="Bride's Side RSVPs" value={stats.brideSide} />
+              <StatCard testId="stat-groom-side" label="Groom's Side RSVPs" value={stats.groomSide} />
             </section>
 
             <section className="mt-8 grid gap-6 lg:grid-cols-2">
@@ -281,6 +303,12 @@ export default function AdminDashboard({ onLogout }) {
               </div>
             </section>
 
+            <EventSettings onChanged={() => load()} />
+
+            <ContactSettings />
+
+            <GallerySettings />
+
             <section className="card-royal mt-8 p-5 sm:p-6">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <h3 className="font-display text-lg font-semibold text-maroon">Guest Management</h3>
@@ -301,6 +329,11 @@ export default function AdminDashboard({ onLogout }) {
                     <option value="no">Not attending</option>
                     <option value="maybe">Maybe</option>
                   </select>
+                  <select data-testid="guests-side-filter" className="input-royal sm:w-40" value={side} onChange={(e) => onSide(e.target.value)}>
+                    <option value="">Both sides</option>
+                    <option value="bride">Bride's side</option>
+                    <option value="groom">Groom's side</option>
+                  </select>
                   <button data-testid="guests-export-btn" onClick={exportCsv} className="btn-maroon !px-4 !py-2.5 text-xs">
                     <Download className="h-4 w-4" /> Export CSV
                   </button>
@@ -312,6 +345,7 @@ export default function AdminDashboard({ onLogout }) {
                   <thead>
                     <tr className="border-b border-gold/30 text-[11px] uppercase tracking-wider text-brown/55">
                       <th className="py-3 pr-4">Guest</th>
+                      <th className="py-3 pr-4">Side</th>
                       <th className="py-3 pr-4">Attendance</th>
                       <th className="py-3 pr-4">Guests</th>
                       <th className="py-3 pr-4">Events</th>
@@ -327,6 +361,7 @@ export default function AdminDashboard({ onLogout }) {
                           <p className="font-medium text-brown">{g.guestName}</p>
                           <p className="text-xs text-brown/55">{g.mobileNumber}</p>
                         </td>
+                        <td className="py-3 pr-4 text-brown/80">{SIDE_NAME[g.side] || "—"}</td>
                         <td className="py-3 pr-4">
                           <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${STATUS_BADGE[g.attendanceStatus]}`}>
                             {STATUS_LABEL[g.attendanceStatus]}
@@ -361,7 +396,7 @@ export default function AdminDashboard({ onLogout }) {
                     {!data.guests.length && (
                       <tr>
                         <td colSpan="8" className="py-10 text-center text-sm italic text-brown/55" data-testid="guests-empty-state">
-                          No RSVPs found{search || status ? " for this filter" : " yet — share the website with your guests!"}
+                          No RSVPs found{search || status || side ? " for this filter" : " yet — share the website with your guests!"}
                         </td>
                       </tr>
                     )}

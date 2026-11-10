@@ -1,4 +1,4 @@
-export const EVENTS = [
+const DEFAULT_EVENTS = [
   { id: "shanti-vidhan-pujan", day: 1, time: "07:30 AM", title: "Shanti Vidhan & Pujan",
     venue: "Bhaiji Ka Mandir, Gacha Gali, Pratapgarh, Rajasthan",
     description: "Begin the wedding celebrations with blessings, devotion, peace, and auspicious prayers." },
@@ -25,4 +25,27 @@ export const EVENTS = [
     venue: "Lal Bagh, Pratapgarh, Rajasthan",
     description: "An evening of celebration, blessings and warm hospitality as family and friends felicitate the newlyweds." },
 ];
+
+// Defaults every event starts with; admin edits are stored in the `wedding_events` collection.
+export const SIDES = ["both", "bride", "groom"];
+export const EVENTS = DEFAULT_EVENTS.map((e) => ({ ...e, side: "both", visible: true }));
 export const EVENT_IDS = new Set(EVENTS.map((e) => e.id));
+export const EDITABLE_FIELDS = ["title", "time", "venue", "description", "mapQuery", "side", "visible"];
+
+// Merge saved admin overrides over the defaults (ids are fixed; fields are editable).
+export const mergeEvents = (overrides = []) => {
+  const byId = new Map(overrides.map((o) => [o.id, o]));
+  return EVENTS.map((e) => {
+    const o = byId.get(e.id) || {};
+    const merged = { ...e };
+    for (const k of EDITABLE_FIELDS) if (o[k] !== undefined) merged[k] = o[k];
+    return merged;
+  });
+};
+
+// Default contact numbers shown for each side until the admin saves their own.
+const DEFAULT_CONTACT_LIST = [
+  { number: "8742005204", label: "Wedding Enquiries & Assistance", name: null },
+  { number: "9828844627", label: "Wedding Enquiries & Assistance", name: null },
+];
+export const DEFAULT_CONTACTS = { bride: DEFAULT_CONTACT_LIST, groom: DEFAULT_CONTACT_LIST };

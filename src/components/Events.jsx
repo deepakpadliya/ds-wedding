@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, Clock, MapPin, Navigation, X } from "lucide-react";
-import { DAYS, EVENTS } from "@/config/weddingDetails";
+import { Link } from "react-router-dom";
+import { DAYS, mapLink } from "@/config/weddingDetails";
+import useEvents, { eventVisibleToSide } from "@/hooks/useEvents";
+import { useSide } from "@/context/SideContext";
 import Reveal, { SectionHeading } from "./Reveal";
 
 function EventModal({ event, onClose }) {
@@ -47,7 +50,7 @@ function EventModal({ event, onClose }) {
           {event.mapQuery && (
             <a
               data-testid="event-directions-link"
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.mapQuery)}`}
+              href={mapLink(event.mapQuery)}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-outline mt-6 w-full !py-3"
@@ -63,13 +66,22 @@ function EventModal({ event, onClose }) {
 
 export default function Events() {
   const [active, setActive] = useState(null);
+  const side = useSide();
+  const EVENTS = useEvents().filter((e) => eventVisibleToSide(e, side));
 
   return (
     <section id="events" data-testid="events-section" className="section-pad scroll-mt-20 bg-beige/50">
       <div className="wrap">
-        <SectionHeading eyebrow="Wedding Events" title="Three Days of Celebration" script="eight blessed occasions" />
+        <SectionHeading eyebrow="Wedding Events" title="Three Days of Celebration" script={`${EVENTS.length} blessed occasions`} />
 
-        {DAYS.map((d) => (
+        {side && (
+          <p data-testid="events-side-note" className="-mt-6 mb-10 text-center text-sm text-brown/70">
+            Showing the celebrations for {side === "bride" ? "Shruti's" : "Deepak's"} side ·{" "}
+            <Link to="/all" className="font-medium text-maroon underline underline-offset-4">view all events</Link>
+          </p>
+        )}
+
+        {DAYS.filter((d) => EVENTS.some((e) => e.day === d.day)).map((d) => (
           <div key={d.day} className="mb-14 last:mb-0">
             <Reveal className="mb-7 flex items-center gap-4">
               <span className="h-px flex-1 bg-gold/40" />
@@ -94,6 +106,11 @@ export default function Events() {
                         loading="lazy"
                         className="h-52 w-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />
+                      {!side && e.side !== "both" && (
+                        <span className="absolute right-4 top-4 rounded-full bg-maroon/90 px-3 py-1 text-[11px] font-medium tracking-wide text-ivory">
+                          {e.side === "bride" ? "Bride's side" : "Groom's side"}
+                        </span>
+                      )}
                       <span className="absolute left-4 top-4 rounded-full bg-ivory/90 px-3 py-1 text-[11px] font-semibold tracking-wide text-maroon">
                         {e.time} IST
                       </span>

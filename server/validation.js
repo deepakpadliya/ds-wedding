@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EVENT_IDS } from "./events.js";
+import { EVENT_IDS, SIDES } from "./events.js";
 
 export class HttpError extends Error {
   constructor(status, detail, extra = {}) {
@@ -44,6 +44,10 @@ const events = z.any().transform((v, ctx) => {
   if (bad.length) { ctx.addIssue({ code: "custom", message: `Unknown event(s): ${bad.join(", ")}` }); return z.NEVER; }
   return cleaned;
 });
+const guestSide = z.preprocess(
+  (v) => (v === "" || v === undefined ? null : v),
+  z.enum(["bride", "groom"], { message: "Side must be bride or groom" }).nullable()
+);
 const count = z.coerce.number().int().min(0).max(20);
 
 export const rsvpCreate = z.object({
@@ -51,6 +55,7 @@ export const rsvpCreate = z.object({
   mobileNumber: mobile,
   attendanceStatus: status,
   attendeeCount: count,
+  side: guestSide.optional().default(null),
   eventsAttending: events.optional().default([]),
   accommodationRequired: z.boolean().optional().default(false),
   message: optText(1000),
@@ -65,10 +70,29 @@ export const rsvpUpdate = z.object({
   mobileNumber: mobile.optional(),
   attendanceStatus: status.optional(),
   attendeeCount: count.optional(),
+  side: guestSide.optional(),
   eventsAttending: events.optional(),
   accommodationRequired: z.boolean().optional(),
   message: optText(1000),
 });
+
+export const eventUpdate = z.object({
+  title: text(2, 100).optional(),
+  time: text(3, 20).optional(),
+  venue: text(2, 200).optional(),
+  description: text(2, 500).optional(),
+  mapQuery: optText(200),
+  side: z.enum(SIDES, { message: "Side must be both, bride or groom" }).optional(),
+  visible: z.boolean().optional(),
+});
+
+const contactItem = z.object({ number: mobile, label: text(2, 60), name: optText(60) });
+export const contactsUpdate = z.object({
+  bride: z.array(contactItem).min(1, "Add at least one contact for the bride's side").max(6, "At most 6 contacts per side"),
+  groom: z.array(contactItem).min(1, "Add at least one contact for the groom's side").max(6, "At most 6 contacts per side"),
+});
+
+export const galleryCaption = z.object({ caption: optText(200) });
 
 export const loginSchema = z.object({
   email: z.string().min(3).max(200),
