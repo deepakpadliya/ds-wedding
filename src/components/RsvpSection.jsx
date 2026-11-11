@@ -65,11 +65,13 @@ function ThankYouCard({ guest, testId }) {
   const first = (guest.guestName || "").split(" ")[0];
   const declined = guest.attendanceStatus === "no";
   const headline = duplicate
-    ? `Thank you, ${first} — we already have your response`
+    ? `You have already responded, ${first}!`
     : declined
       ? `Thank you, ${first}, for letting us know`
       : `Thank you, ${first}, for your response`;
-  const body = declined
+  const body = duplicate
+    ? "We already have an RSVP for this mobile number, so there is no need to send it again. Thank you — we can't wait to celebrate with you!"
+    : declined
     ? "We will miss you on our special days, but you will be in our hearts and prayers. Thank you for your blessings."
     : "We are so happy you will be celebrating with us. We will be waiting for you in all the wedding vibes — the music, the colours, the laughter and the love.";
   return (
@@ -84,7 +86,7 @@ function ThankYouCard({ guest, testId }) {
       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", delay: 0.2, stiffness: 200, damping: 12 }}>
         <Heart className="mx-auto h-10 w-10 fill-maroon/15 text-maroon" />
       </motion.div>
-      <p className="mt-4 font-script text-4xl text-gold-deep">With love &amp; gratitude</p>
+      <p className="mt-4 font-script text-4xl text-gold-deep">{duplicate ? "Already on our list" : "With love & gratitude"}</p>
       <p className="mt-3 font-display text-2xl font-semibold text-maroon">{headline}</p>
       <p className="mt-3 font-lora italic text-brown/75">{body}</p>
       <p className="mt-5 text-sm text-brown/60">— Deepak &amp; Shruti and families</p>
@@ -196,8 +198,9 @@ export default function RsvpSection() {
       toast.success("Thank you! We can't wait to celebrate with you.");
     } catch (err) {
       if (err.response?.status === 409 && err.response?.data?.existing) {
-        setResult({ type: "duplicate", guest: err.response.data.existing });
-        toast.info("This mobile number already has an RSVP");
+        // Greet them by the name they just typed (not whatever name the earlier RSVP used).
+        setResult({ type: "duplicate", guest: { ...err.response.data.existing, guestName: form.guestName.trim() } });
+        toast.info("You have already responded — thank you!");
       } else {
         fail(getErrorMessage(err, "Could not send your RSVP — please try again"));
       }
@@ -448,7 +451,7 @@ export default function RsvpSection() {
   return (
     <section id="rsvp" data-testid="rsvp-section" className="section-pad scroll-mt-20 bg-beige/50">
       <div className="wrap">
-        <SectionHeading eyebrow="RSVP" title="Kindly Respond by 1 December 2026" script="will you join us?" />
+        <SectionHeading eyebrow="RSVP" title="We Would Love to Hear From You" script="will you join us?" />
 
         {result ? (
           <div className="space-y-6">
@@ -473,12 +476,12 @@ export default function RsvpSection() {
               <div className="mb-8">
                 <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.18em] text-brown/55">
                   <span>Question {Math.min(step + 1, steps.length)} of {steps.length}</span>
-                  <span>{Math.round(((step + 1) / steps.length) * 100)}%</span>
+                  <span>{Math.round((step / steps.length) * 100)}%</span>
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gold/20">
                   <motion.div
                     className="h-full rounded-full bg-gradient-to-r from-gold to-maroon"
-                    animate={{ width: `${((step + 1) / steps.length) * 100}%` }}
+                    animate={{ width: `${(step / steps.length) * 100}%` }}
                     transition={{ duration: 0.5, ease: "easeOut" }}
                   />
                 </div>

@@ -1,5 +1,6 @@
 import Reveal, { SectionHeading } from "./Reveal";
 import { BRIDE, GROOM, STORY } from "@/config/weddingDetails";
+import useSettings from "@/hooks/useSettings";
 
 function PersonCard({ img, name, role, note, testId }) {
   return (
@@ -17,6 +18,7 @@ function PersonCard({ img, name, role, note, testId }) {
 }
 
 export default function Story() {
+  const { showTimeline } = useSettings();
   return (
     <section id="story" data-testid="story-section" className="section-pad relative scroll-mt-20 bg-ivory">
       <div className="wrap">
@@ -40,7 +42,8 @@ export default function Story() {
           <p className="font-lora italic text-brown/75">{STORY.intro}</p>
         </Reveal>
 
-        <div className="relative mt-16">
+        {showTimeline && (
+        <div data-testid="story-timeline" className="relative mt-16">
           <div className="absolute left-5 top-0 h-full w-px bg-gradient-to-b from-gold/60 via-gold/40 to-transparent md:left-1/2 md:-translate-x-1/2" />
           <ol className="space-y-10">
             {STORY.timeline.map((item, i) => (
@@ -64,6 +67,7 @@ export default function Story() {
             ))}
           </ol>
         </div>
+        )}
       </div>
     </section>
   );

@@ -1,18 +1,25 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 
-// Photos uploaded from the admin panel, newest first.
+let request = null; // one shared fetch for the gallery, nav and footer
+
+// Photos and videos uploaded from the admin panel, newest first.
+// `loaded` is false until the first response, so callers can avoid flashing an empty gallery.
 export default function useGallery() {
-  const [photos, setPhotos] = useState([]);
+  const [state, setState] = useState({ photos: [], loaded: false });
   useEffect(() => {
     let live = true;
-    api
-      .get("/v1/gallery")
-      .then(({ data }) => live && setPhotos(data.photos || []))
-      .catch(() => {});
+    request ??= api.get("/v1/gallery").then(({ data }) => data.photos || []).catch(() => []);
+    request.then((photos) => live && setState({ photos, loaded: true }));
     return () => {
       live = false;
     };
   }, []);
-  return photos;
+  return state;
+}
+
+// Menu links, minus the gallery link while nothing has been uploaded.
+export function useNavLinks(links) {
+  const { photos } = useGallery();
+  return photos.length ? links : links.filter((l) => l.id !== "gallery");
 }

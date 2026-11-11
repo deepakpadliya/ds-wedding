@@ -3,9 +3,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Heart, Menu, X } from "lucide-react";
 import { NAV_LINKS } from "@/config/weddingDetails";
 import { scrollToId, scrollToTop } from "@/lib/scroll";
+import { useNavLinks } from "@/hooks/useGallery";
 import { Monogram } from "./Ornaments";
 
 export default function Navbar() {
+  const navLinks = useNavLinks(NAV_LINKS);
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -35,7 +37,7 @@ export default function Navbar() {
           </span>
         </button>
         <nav className="hidden items-center gap-7 md:flex">
-          {NAV_LINKS.map((l) => (
+          {navLinks.map((l) => (
             <button
               key={l.id}
               data-testid={`nav-${l.id}-link`}
@@ -67,7 +69,7 @@ export default function Navbar() {
             className="overflow-hidden border-t border-gold/20 bg-ivory/95 backdrop-blur-md md:hidden"
           >
             <div className="flex flex-col gap-1 px-6 py-4">
-              {NAV_LINKS.map((l) => (
+              {navLinks.map((l) => (
                 <button
                   key={l.id}
                   data-testid={`nav-mobile-${l.id}-link`}

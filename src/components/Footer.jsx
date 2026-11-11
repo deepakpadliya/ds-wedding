@@ -1,6 +1,7 @@
 import { Heart } from "lucide-react";
 import { NAV_LINKS, WEDDING } from "@/config/weddingDetails";
 import { scrollToId, scrollToTop } from "@/lib/scroll";
+import { useNavLinks } from "@/hooks/useGallery";
 import useContacts, { contactsForSide } from "@/hooks/useContacts";
 import { useSide } from "@/context/SideContext";
 import { Monogram } from "./Ornaments";
@@ -8,6 +9,7 @@ import { Monogram } from "./Ornaments";
 export default function Footer() {
   const side = useSide();
   const contacts = useContacts();
+  const navLinks = useNavLinks(NAV_LINKS);
   return (
     <footer data-testid="footer" className="no-print bg-maroon px-5 py-14 text-center text-ivory sm:px-8">
       <div className="wrap">
@@ -20,7 +22,7 @@ export default function Footer() {
         </p>
 
         <nav className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-          {NAV_LINKS.map((l) => (
+          {navLinks.map((l) => (
             <button
               key={l.id}
               data-testid={`footer-${l.id}-link`}

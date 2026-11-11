@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 import { db, ping } from "./db.js";
 import { EVENT_IDS, mergeEvents, EDITABLE_FIELDS, DEFAULT_CONTACTS } from "./events.js";
-import { HttpError, parse, rsvpCreate, rsvpUpdate, loginSchema, eventUpdate, contactsUpdate, galleryCaption } from "./validation.js";
+import { HttpError, parse, rsvpCreate, rsvpUpdate, loginSchema, eventUpdate, contactsUpdate, galleryCaption, settingsUpdate } from "./validation.js";
 import { requireAdmin, setAuthCookies, clearAuthCookies, verifyPassword, decodeRefresh, activeAdmin } from "./auth.js";
 
 const guests = () => db.collection("wedding_guests");
@@ -31,6 +31,12 @@ const sniffImage = (b) => {
   if (b.length > 12 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
   if (b.length > 12 && b.subarray(0, 4).toString() === "RIFF" && b.subarray(8, 12).toString() === "WEBP") return "image/webp";
   return null;
+};
+// Site-wide switches. Defaults apply until the admin saves a change.
+const SETTING_DEFAULTS = { showTimeline: false };
+const loadSettings = async () => {
+  const saved = await db.collection("wedding_settings").findOne({ key: "site" }, { projection: { _id: 0, key: 0, updatedAt: 0 } });
+  return { ...SETTING_DEFAULTS, ...(saved || {}) };
 };
 const loadContacts = async () => {
   const saved = await db.collection("wedding_settings").findOne({ key: "contacts" }, { projection: { _id: 0 } });
@@ -69,6 +75,8 @@ router.get("/health", wrap(async (_req, res) => {
 }));
 
 router.get("/v1/events", wrap(async (_req, res) => res.json({ events: await loadEvents() })));
+
+router.get("/v1/settings", wrap(async (_req, res) => res.json({ settings: await loadSettings() })));
 
 router.get("/v1/contacts", wrap(async (_req, res) => res.json({ contacts: await loadContacts() })));
 
@@ -257,6 +265,14 @@ admin.delete("/gallery/:id", wrap(async (req, res) => {
   if (!r.deletedCount) throw new HttpError(404, "Photo not found");
   await chunks().deleteMany({ videoId: req.params.id });
   res.json({ ok: true, deleted: req.params.id });
+}));
+
+admin.put("/settings", wrap(async (req, res) => {
+  const data = parse(settingsUpdate, req.body);
+  const set = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+  if (!Object.keys(set).length) throw new HttpError(422, "Nothing to update");
+  await db.collection("wedding_settings").updateOne({ key: "site" }, { $set: { ...set, updatedAt: new Date() } }, { upsert: true });
+  res.json({ settings: await loadSettings() });
 }));
 
 admin.get("/contacts", wrap(async (_req, res) => res.json({ contacts: await loadContacts() })));

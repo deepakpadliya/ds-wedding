@@ -178,31 +178,44 @@ export const EVENTS = [
   },
 ];
 
-export const GALLERY = [
-  { src: "/images/couple.png", alt: "Illustrated portrait of Deepak and Shruti under a golden floral arch" },
-  ...EVENTS.map((e) => ({ src: e.image, alt: `Illustration of the ${e.title} celebration` })),
-  { src: "/images/bride.png", alt: "Illustrated portrait of the bride Shruti in a maroon and gold lehenga" },
-  { src: "/images/groom.png", alt: "Illustrated portrait of the groom Deepak in an ivory sherwani" },
-];
-
 // Story copy — edit these lines any time to add your own memories.
 export const STORY = {
   intro: "Two hearts, two families, one beautiful beginning. Deepak and Shruti are ready to begin a lifetime of togetherness — and they cannot wait to share every moment of it with the people they love most.",
   timeline: [
     {
-      title: "The First Hello",
-      label: "Where it all began",
-      text: "Some meetings feel like they were written in the stars. One hello, one smile — and two lives quietly began to turn towards each other.",
+      title: "The First Meeting",
+      label: "14 January 2026",
+      text: "On the auspicious day of Makar Sankranti, Deepak and Shruti met for the first time — little knowing it was the first page of their forever story.",
     },
     {
-      title: "The Engagement",
-      label: "A promise made",
-      text: "With the blessings of both families, a promise was made — to walk together through every season of life, hand in hand.",
+      title: "A Little Hello",
+      label: "14 January 2026",
+      text: "That very night, a simple “Hello” — and a chat about Sankranti, khichdi, sandwiches and hot coffee on winter nights that just did not want to end.",
     },
     {
-      title: "Wedding Bells",
+      title: "Our First Recorded Call",
+      label: "23 January 2026",
+      text: "After a day of “let’s talk when we’re both free”, the first call finally happened that evening — and then another, and another. Three calls before the night was over.",
+    },
+    {
+      title: "The Day We Said Yes",
+      label: "14 March 2026",
+      text: "The day Deepak and Shruti mutually agreed to spend their lives together. Plans to meet, and two late-night calls to end a day they will never forget.",
+    },
+    {
+      title: "A Little Closer, Every Day",
+      label: "30 March 2026",
+      text: "Good mornings, long talks and endless laughter. An evening that began with a call ended with Shruti at the doorstep — every day, a little closer.",
+    },
+    {
+      title: "Engagement / Ring Ceremony",
+      label: "20 April 2026",
+      text: "Mehendi-coloured hands, the blessings of both families, rings exchanged and a photographer capturing every smile — a promise made to walk together through every season of life.",
+    },
+    {
+      title: "The Beginning of Forever",
       label: "12 December 2026",
-      text: "Two families come together in Pratapgarh as Deepak and Shruti begin their forever journey.",
+      text: "Two families come together in Pratapgarh as Deepak and Shruti take the seven vows and begin their forever journey.",
     },
   ],
   brideFamilyNote: `Daughter of ${BRIDE.father} & ${BRIDE.mother}`,

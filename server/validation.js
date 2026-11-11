@@ -92,6 +92,8 @@ export const contactsUpdate = z.object({
   groom: z.array(contactItem).min(1, "Add at least one contact for the groom's side").max(6, "At most 6 contacts per side"),
 });
 
+export const settingsUpdate = z.object({ showTimeline: z.boolean().optional() });
+
 export const galleryCaption = z.object({ caption: optText(200) });
 
 export const loginSchema = z.object({

@@ -1,22 +1,18 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Play, X } from "lucide-react";
-import { GALLERY as ILLUSTRATIONS } from "@/config/weddingDetails";
 import useGallery from "@/hooks/useGallery";
 import Reveal, { SectionHeading } from "./Reveal";
 
 export default function Gallery() {
-  // Uploaded photos (newest first), followed by the illustrated set.
-  const uploaded = useGallery();
-  const GALLERY = [
-    ...uploaded.map((p) => ({
-      src: p.type === "video" ? p.poster : p.url,
-      video: p.type === "video" ? p.url : null,
-      alt: p.caption || (p.type === "video" ? "A video from the celebration" : "A moment from the celebration"),
-      caption: p.caption,
-    })),
-    ...ILLUSTRATIONS,
-  ];
+  // Only what was uploaded from the admin panel (newest first) — no placeholder images.
+  const { photos: uploaded } = useGallery();
+  const GALLERY = uploaded.map((p) => ({
+    src: p.type === "video" ? p.poster : p.url,
+    video: p.type === "video" ? p.url : null,
+    alt: p.caption || (p.type === "video" ? "A video from the celebration" : "A moment from the celebration"),
+    caption: p.caption,
+  }));
   const [idx, setIdx] = useState(-1);
   const open = idx >= 0;
 
@@ -30,6 +26,8 @@ export default function Gallery() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [idx]);
+
+  if (!GALLERY.length) return null; // nothing uploaded yet — hide the whole section
 
   return (
     <section id="gallery" data-testid="gallery-section" className="section-pad scroll-mt-20 bg-beige/50">

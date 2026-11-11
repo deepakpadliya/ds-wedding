@@ -7,6 +7,7 @@ import useEvents from "@/hooks/useEvents";
 import EventSettings from "@/components/admin/EventSettings";
 import ContactSettings from "@/components/admin/ContactSettings";
 import GallerySettings from "@/components/admin/GallerySettings";
+import SiteSettings from "@/components/admin/SiteSettings";
 import { Monogram } from "@/components/Ornaments";
 
 const STATUS_BADGE = {
@@ -302,6 +303,8 @@ export default function AdminDashboard({ onLogout }) {
                 </ul>
               </div>
             </section>
+
+            <SiteSettings />
 
             <EventSettings onChanged={() => load()} />
 
