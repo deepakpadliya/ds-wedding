@@ -149,9 +149,10 @@ router.post("/v1/dance", rateLimit("dance", 5, 600), wrap(async (req, res) => {
   const b = req.body || {};
   if (String(b.website || "").trim()) return res.status(201).json({ ok: true }); // honeypot: bots fill hidden fields
   if (!String(b.performers || "").trim()) throw new HttpError(422, [{ loc: ["performers"], msg: "Please tell us who will be dancing" }]);
+  if (!String(b.song || "").trim()) throw new HttpError(422, [{ loc: ["song"], msg: "Please tell us the song name" }]);
   let contact;
   try { contact = normalizeMobile(b.contact); } catch (e) { throw new HttpError(422, [{ loc: ["contact"], msg: e.message }]); }
-  if (b.side && !["bride", "groom", "both"].includes(b.side)) throw new HttpError(422, [{ loc: ["side"], msg: "Invalid side" }]);
+  if (!["bride", "groom"].includes(b.side)) throw new HttpError(422, [{ loc: ["side"], msg: "Please choose bride's side or groom's side" }]);
   if (b.links && !/^https?:\/\//i.test(String(b.links).trim())) throw new HttpError(422, [{ loc: ["links"], msg: "Song link must start with http:// or https://" }]);
   const { id, token } = await addDanceRequest({ ...b, contact });
   res.status(201).json({ ok: true, id, token }); // the token lets this one visitor attach audio/video for the next hour

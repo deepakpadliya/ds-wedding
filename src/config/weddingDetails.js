@@ -26,7 +26,7 @@ export const GROOM = {
 export const BRIDE = {
   name: "Shruti Minda",
   father: "Ajit Minda",
-  mother: "Vandna Minda",
+  mother: "Vandana Minda",
 };
 
 export const WEDDING = {
@@ -55,7 +55,7 @@ export const WEDDING = {
 export const INVITATION = {
   opening: "Together with their families",
   groomParents: "Kailash Ji & Naiyan Bala Padliya",
-  brideParents: "Ajit Minda & Vandna Minda",
+  brideParents: "Ajit Minda & Vandana Minda",
   inviteLine: "cordially invite you to celebrate the wedding of",
   couple: "Deepak Padliya & Shruti Minda",
   date: "12 December 2026",
