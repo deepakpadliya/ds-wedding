@@ -7,6 +7,7 @@ import Events from "@/components/Events";
 import Invitation from "@/components/Invitation";
 import Gallery from "@/components/Gallery";
 import VenueTravel from "@/components/VenueTravel";
+import DanceSignup from "@/components/DanceSignup";
 import RsvpSection from "@/components/RsvpSection";
 import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
@@ -24,6 +25,7 @@ export default function Home({ side = null }) {
       <Invitation />
       <Gallery />
       <VenueTravel />
+      <DanceSignup />
       <RsvpSection />
       <Contact />
       <Footer />

@@ -1,12 +1,42 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Music, VolumeX } from "lucide-react";
 import { toast } from "sonner";
-import { WEDDING } from "@/config/weddingDetails";
+import { WEDDING, GROOM, BRIDE } from "@/config/weddingDetails";
 
 export default function MusicToggle() {
   const ref = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const audio = ref.current;
+    if (!audio) return;
+    audio.volume = 0.45;
+    const events = ["pointerdown", "touchstart", "keydown", "wheel", "scroll"];
+    const cleanup = () => events.forEach((e) => window.removeEventListener(e, start));
+    function start() {
+      audio.play().then(cleanup).catch(() => {});
+    }
+    // Try immediately; if the browser blocks it, start on first user interaction.
+    audio.play().then(cleanup).catch(() => {
+      events.forEach((e) => window.addEventListener(e, start, { passive: true }));
+    });
+    return cleanup;
+  }, []);
+
+  const [entered, setEntered] = useState(() => {
+    try { return sessionStorage.getItem("entered") === "1"; } catch { return false; }
+  });
+
+  const enter = () => {
+    try { sessionStorage.setItem("entered", "1"); } catch {}
+    setEntered(true);
+    const audio = ref.current;
+    if (audio) {
+      audio.volume = 0.45;
+      audio.play().catch(() => {});
+    }
+  };
 
   const toggle = () => {
     const audio = ref.current;
@@ -23,6 +53,22 @@ export default function MusicToggle() {
   };
 
   return (
+    <>
+    {!entered && (
+      <div className="no-print fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-ivory px-6 text-center">
+        <p className="text-xs uppercase tracking-[0.3em] text-gold-deep">You are cordially invited to the wedding of</p>
+        <h1 className="font-serif text-4xl text-maroon sm:text-6xl">
+          {BRIDE.name.split(" ")[0]} <span className="text-gold-deep">&amp;</span> {GROOM.name.split(" ")[0]}
+        </h1>
+        <button
+          data-testid="enter-invitation-btn"
+          onClick={enter}
+          className="rounded-full border border-gold bg-maroon px-8 py-3 text-ivory shadow-lg transition hover:scale-105"
+        >
+          Open Invitation
+        </button>
+      </div>
+    )}
     <div className="no-print fixed bottom-5 left-5 z-[60]">
       <button
         data-testid="music-toggle-btn"
@@ -40,11 +86,13 @@ export default function MusicToggle() {
         ref={ref}
         src={WEDDING.musicUrl}
         loop
-        preload="none"
+        autoPlay
+        preload="auto"
         onError={() => setFailed(true)}
         onPause={() => setPlaying(false)}
         onPlay={() => setPlaying(true)}
       />
     </div>
+    </>
   );
 }

@@ -1,4 +1,4 @@
-import { MessageCircle, Printer } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { INVITATION } from "@/config/weddingDetails";
 import Reveal, { SectionHeading } from "./Reveal";
 
@@ -46,9 +46,6 @@ export default function Invitation() {
           >
             <MessageCircle className="h-4 w-4" /> Share on WhatsApp
           </a>
-          <button data-testid="invitation-print-btn" className="btn-outline" onClick={() => window.print()}>
-            <Printer className="h-4 w-4" /> Print Invitation
-          </button>
         </Reveal>
       </div>
     </section>

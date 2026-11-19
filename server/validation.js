@@ -76,8 +76,20 @@ export const rsvpUpdate = z.object({
   message: optText(1000),
 });
 
+const eventDay = z.number({ message: "Day must be 1, 2 or 3" }).int().min(1, "Day must be 1, 2 or 3").max(3, "Day must be 1, 2 or 3");
+export const eventCreate = z.object({
+  title: text(2, 100),
+  day: eventDay,
+  time: text(3, 20),
+  venue: text(2, 200),
+  description: optText(500),
+  mapQuery: optText(200),
+  side: z.enum(SIDES, { message: "Side must be both, bride or groom" }).default("both"),
+  visible: z.boolean().default(true),
+});
 export const eventUpdate = z.object({
   title: text(2, 100).optional(),
+  day: eventDay.optional(),
   time: text(3, 20).optional(),
   venue: text(2, 200).optional(),
   description: text(2, 500).optional(),

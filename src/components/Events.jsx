@@ -7,6 +7,16 @@ import useEvents, { eventVisibleToSide } from "@/hooks/useEvents";
 import { useSide } from "@/context/SideContext";
 import Reveal, { SectionHeading } from "./Reveal";
 
+// Events the admin adds may have no picture yet: show a plain royal panel instead of a broken image.
+function Cover({ event, className }) {
+  if (event.image) return <img src={event.image} alt={`${event.title} illustration`} loading="lazy" className={className} />;
+  return (
+    <div className={`${className} flex items-center justify-center bg-gradient-to-br from-maroon to-maroon-deep p-6 text-center font-display text-2xl text-ivory`} role="img" aria-label={event.title}>
+      {event.title}
+    </div>
+  );
+}
+
 function EventModal({ event, onClose }) {
   return (
     <motion.div
@@ -32,7 +42,7 @@ function EventModal({ event, onClose }) {
         >
           <X className="h-4 w-4" />
         </button>
-        <img src={event.image} alt={`${event.title} illustration`} className="h-52 w-full object-cover sm:h-60" />
+        <Cover event={event} className="h-52 w-full object-cover sm:h-60" />
         <div className="p-6">
           <h3 className="font-display text-2xl font-semibold text-maroon">{event.title}</h3>
           <div className="mt-4 space-y-2.5 text-sm text-brown/85">
@@ -100,12 +110,7 @@ export default function Events() {
                     className="card-royal group flex h-full flex-col overflow-hidden transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_28px_60px_-30px_rgba(100,30,43,0.45)]"
                   >
                     <div className="relative overflow-hidden">
-                      <img
-                        src={e.image}
-                        alt={`${e.title} illustration`}
-                        loading="lazy"
-                        className="h-52 w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      />
+                      <Cover event={e} className="h-52 w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                       {!side && e.side !== "both" && (
                         <span className="absolute right-4 top-4 rounded-full bg-maroon/90 px-3 py-1 text-[11px] font-medium tracking-wide text-ivory">
                           {e.side === "bride" ? "Bride's side" : "Groom's side"}

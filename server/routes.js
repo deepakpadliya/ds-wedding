@@ -1,7 +1,8 @@
 import express, { Router } from "express";
 import { db, ping } from "./db.js";
-import { EVENT_IDS, mergeEvents, EDITABLE_FIELDS, DEFAULT_CONTACTS } from "./events.js";
-import { HttpError, parse, rsvpCreate, rsvpUpdate, loginSchema, eventUpdate, contactsUpdate, galleryCaption, settingsUpdate } from "./validation.js";
+import { mergeEvents, EDITABLE_FIELDS, DEFAULT_CONTACTS, isDefaultEvent, syncEventIds } from "./events.js";
+import { HttpError, normalizeMobile, parse, rsvpCreate, rsvpUpdate, loginSchema, eventCreate, eventUpdate, contactsUpdate, galleryCaption, settingsUpdate } from "./validation.js";
+import planner, { addDanceRequest, publicMedia } from "./planner.js";
 import { requireAdmin, setAuthCookies, clearAuthCookies, verifyPassword, decodeRefresh, activeAdmin } from "./auth.js";
 
 const guests = () => db.collection("wedding_guests");
@@ -42,7 +43,11 @@ const loadContacts = async () => {
   const saved = await db.collection("wedding_settings").findOne({ key: "contacts" }, { projection: { _id: 0 } });
   return { bride: saved?.bride?.length ? saved.bride : DEFAULT_CONTACTS.bride, groom: saved?.groom?.length ? saved.groom : DEFAULT_CONTACTS.groom };
 };
-const loadEvents = async () => mergeEvents(await db.collection("wedding_events").find({}, { projection: { _id: 0 } }).toArray());
+const loadEvents = async () => {
+  const saved = await db.collection("wedding_events").find({}, { projection: { _id: 0 } }).toArray();
+  syncEventIds(saved.filter((o) => o.custom).map((o) => o.id)); // RSVP validation accepts admin-added events too
+  return mergeEvents(saved);
+};
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const guestOut = (d) => {
   if (!d) return {};
@@ -75,6 +80,13 @@ router.get("/health", wrap(async (_req, res) => {
 }));
 
 router.get("/v1/events", wrap(async (_req, res) => res.json({ events: await loadEvents() })));
+
+router.get("/v1/events/:id/image", wrap(async (req, res) => {
+  const doc = await db.collection("wedding_event_images").findOne({ id: req.params.id }, { projection: { _id: 0 } });
+  if (!doc) throw new HttpError(404, "Image not found");
+  res.set({ "Content-Type": doc.contentType, "Cache-Control": "public, max-age=31536000, immutable" }); // the URL carries ?v=, so a new upload gets a new URL
+  res.send(Buffer.from(doc.data.buffer));
+}));
 
 router.get("/v1/settings", wrap(async (_req, res) => res.json({ settings: await loadSettings() })));
 
@@ -121,6 +133,7 @@ router.get("/v1/gallery/:id/video", wrap(async (req, res) => {
 }));
 
 router.post("/v1/rsvp", rateLimit("rsvp", 8, 60), wrap(async (req, res) => {
+  await loadEvents();
   const data = parse(rsvpCreate, req.body);
   const dup = async () => res.status(409).json({ detail: DUP, existing: guestOut(await guests().findOne({ mobileNumber: data.mobileNumber })) });
   if (await guests().findOne({ mobileNumber: data.mobileNumber })) return dup();
@@ -130,6 +143,25 @@ router.post("/v1/rsvp", rateLimit("rsvp", 8, 60), wrap(async (req, res) => {
   catch (e) { if (e.code === 11000) return dup(); throw e; }
   res.status(201).json(guestOut(doc));
 }));
+
+// Guests who want to dance sign up here; the family reviews and orders them in the admin planner.
+router.post("/v1/dance", rateLimit("dance", 5, 600), wrap(async (req, res) => {
+  const b = req.body || {};
+  if (String(b.website || "").trim()) return res.status(201).json({ ok: true }); // honeypot: bots fill hidden fields
+  if (!String(b.performers || "").trim()) throw new HttpError(422, [{ loc: ["performers"], msg: "Please tell us who will be dancing" }]);
+  let contact;
+  try { contact = normalizeMobile(b.contact); } catch (e) { throw new HttpError(422, [{ loc: ["contact"], msg: e.message }]); }
+  if (b.side && !["bride", "groom", "both"].includes(b.side)) throw new HttpError(422, [{ loc: ["side"], msg: "Invalid side" }]);
+  if (b.links && !/^https?:\/\//i.test(String(b.links).trim())) throw new HttpError(422, [{ loc: ["links"], msg: "Song link must start with http:// or https://" }]);
+  const { id, token } = await addDanceRequest({ ...b, contact });
+  res.status(201).json({ ok: true, id, token }); // the token lets this one visitor attach audio/video for the next hour
+}));
+
+const tok = (req) => String(req.get("x-upload-token") || "");
+router.post("/v1/dance/:id/media/init", rateLimit("dance-media", 10, 600), wrap(async (req, res) => res.status(201).json(await publicMedia.init(req.params.id, tok(req), req.body))));
+router.put("/v1/dance/media/:id/chunks/:i", rateLimit("dance-chunk", 120, 600), express.raw({ type: "application/octet-stream", limit: "3mb" }), wrap(async (req, res) => res.json(await publicMedia.chunk(req.params.id, tok(req), req.params.i, req.body))));
+router.post("/v1/dance/media/:id/complete", rateLimit("dance-media", 10, 600), wrap(async (req, res) => res.json(await publicMedia.complete(req.params.id, tok(req)))));
+router.delete("/v1/dance/media/:id", rateLimit("dance-media", 10, 600), wrap(async (req, res) => { await publicMedia.discard(req.params.id, tok(req)); res.json({ ok: true }); }));
 
 router.post("/v1/admin/login", rateLimit("login", 10, 60), wrap(async (req, res) => {
   const { email: rawEmail, password } = parse(loginSchema, req.body);
@@ -285,19 +317,62 @@ admin.put("/contacts", wrap(async (req, res) => {
 
 admin.get("/events", wrap(async (_req, res) => res.json({ events: await loadEvents() })));
 
+const eventsColl = () => db.collection("wedding_events");
+const eventImages = () => db.collection("wedding_event_images");
+const eventExists = async (id) => isDefaultEvent(id) || !!(await eventsColl().findOne({ id, custom: true }, { projection: { id: 1 } }));
+const eventFields = (data) => Object.fromEntries(EDITABLE_FIELDS.filter((k) => data[k] !== undefined).map((k) => [k, data[k]]));
+
+admin.post("/events", wrap(async (req, res) => {
+  const data = parse(eventCreate, req.body);
+  const slug = data.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "event";
+  const now = new Date();
+  await eventsColl().insertOne({ id: `${slug}-${crypto.randomUUID().slice(0, 6)}`, custom: true, ...eventFields(data), createdAt: now, updatedAt: now });
+  res.status(201).json({ events: await loadEvents() });
+}));
+
 admin.patch("/events/:id", wrap(async (req, res) => {
-  if (!EVENT_IDS.has(req.params.id)) throw new HttpError(404, "Event not found");
+  if (!(await eventExists(req.params.id))) throw new HttpError(404, "Event not found");
   const data = parse(eventUpdate, req.body);
-  const set = Object.fromEntries(EDITABLE_FIELDS.filter((k) => data[k] !== undefined).map((k) => [k, data[k]]));
+  const set = eventFields(data);
   if (!Object.keys(set).length) throw new HttpError(422, "Nothing to update");
   set.updatedAt = new Date();
-  await db.collection("wedding_events").updateOne({ id: req.params.id }, { $set: set }, { upsert: true });
+  await eventsColl().updateOne({ id: req.params.id }, { $set: set }, { upsert: true });
   res.json({ events: await loadEvents() });
 }));
 
+// Cover image: the browser resizes it first, so it arrives as a small JPEG (PNG / WebP also accepted).
+admin.put("/events/:id/image", express.raw({ type: ["image/jpeg", "image/png", "image/webp"], limit: "4mb" }), wrap(async (req, res) => {
+  if (!(await eventExists(req.params.id))) throw new HttpError(404, "Event not found");
+  const buf = req.body;
+  if (!Buffer.isBuffer(buf) || !buf.length) throw new HttpError(422, "Send the image as the request body (JPEG, PNG or WebP, up to 4 MB)");
+  const contentType = sniffImage(buf);
+  if (!contentType) throw new HttpError(422, "Only JPEG, PNG or WebP images are allowed");
+  await eventImages().updateOne({ id: req.params.id }, { $set: { data: buf, contentType, updatedAt: new Date() } }, { upsert: true });
+  await eventsColl().updateOne({ id: req.params.id }, { $set: { imageVer: Date.now() } }, { upsert: true });
+  res.json({ events: await loadEvents() });
+}));
+
+// Remove an uploaded cover (built-in events go back to their original picture).
+admin.delete("/events/:id/image", wrap(async (req, res) => {
+  if (!(await eventExists(req.params.id))) throw new HttpError(404, "Event not found");
+  await eventImages().deleteOne({ id: req.params.id });
+  await eventsColl().updateOne({ id: req.params.id }, { $unset: { imageVer: "" } });
+  res.json({ events: await loadEvents() });
+}));
+
+// Built-in events: restore the original text, side and picture.
 admin.delete("/events/:id/overrides", wrap(async (req, res) => {
-  if (!EVENT_IDS.has(req.params.id)) throw new HttpError(404, "Event not found");
-  await db.collection("wedding_events").deleteOne({ id: req.params.id });
+  if (!isDefaultEvent(req.params.id)) throw new HttpError(404, "Event not found");
+  await eventsColl().deleteOne({ id: req.params.id });
+  await eventImages().deleteOne({ id: req.params.id });
+  res.json({ events: await loadEvents() });
+}));
+
+// Events the admin added can be deleted; built-in ones can only be hidden.
+admin.delete("/events/:id", wrap(async (req, res) => {
+  const r = await eventsColl().deleteOne({ id: req.params.id, custom: true });
+  if (!r.deletedCount) throw new HttpError(404, "Only events you added can be deleted — hide built-in events instead");
+  await eventImages().deleteOne({ id: req.params.id });
   res.json({ events: await loadEvents() });
 }));
 
@@ -340,6 +415,7 @@ admin.get("/guests/:id", wrap(async (req, res) => {
 }));
 
 admin.patch("/guests/:id", wrap(async (req, res) => {
+  await loadEvents();
   const data = parse(rsvpUpdate, req.body);
   const updates = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined && v !== null));
   if (!Object.keys(updates).length) throw new HttpError(422, "Nothing to update");
@@ -361,6 +437,8 @@ admin.delete("/guests/:id", wrap(async (req, res) => {
   if (!doc) throw new HttpError(404, "RSVP not found");
   res.json({ ok: true, deleted: req.params.id });
 }));
+
+admin.use("/planner", planner);
 
 router.use("/v1/admin", admin);
 export default router;

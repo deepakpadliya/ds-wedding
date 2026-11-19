@@ -260,5 +260,6 @@ export const NAV_LINKS = [
   { id: "invitation", label: "Invitation" },
   { id: "gallery", label: "Gallery" },
   { id: "venue", label: "Venue" },
+  { id: "dance", label: "Dance" },
   { id: "rsvp", label: "RSVP" },
 ];

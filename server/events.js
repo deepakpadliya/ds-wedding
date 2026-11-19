@@ -26,21 +26,48 @@ const DEFAULT_EVENTS = [
     description: "An evening of celebration, blessings and warm hospitality as family and friends felicitate the newlyweds." },
 ];
 
-// Defaults every event starts with; admin edits are stored in the `wedding_events` collection.
+// Defaults every event starts with; admin edits (and any events the admin adds) are stored in `wedding_events`.
 export const SIDES = ["both", "bride", "groom"];
+export const DAY_LABELS = { 1: "Thursday, 10 December 2026", 2: "Friday, 11 December 2026", 3: "Saturday, 12 December 2026" };
 export const EVENTS = DEFAULT_EVENTS.map((e) => ({ ...e, side: "both", visible: true }));
-export const EVENT_IDS = new Set(EVENTS.map((e) => e.id));
-export const EDITABLE_FIELDS = ["title", "time", "venue", "description", "mapQuery", "side", "visible"];
+const DEFAULT_IDS = new Set(EVENTS.map((e) => e.id));
+// Ids guests may pick in the RSVP: the built-in events plus admin-added ones (kept in sync by syncEventIds).
+export const EVENT_IDS = new Set(DEFAULT_IDS);
+export const EDITABLE_FIELDS = ["title", "day", "time", "venue", "description", "mapQuery", "side", "visible"];
 
-// Merge saved admin overrides over the defaults (ids are fixed; fields are editable).
+const minutes = (t) => {
+  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec(String(t || "").trim());
+  if (!m) return 24 * 60;
+  let h = parseInt(m[1], 10) % 12;
+  if ((m[3] || "").toUpperCase() === "PM" || (!m[3] && parseInt(m[1], 10) >= 12)) h += 12;
+  return h * 60 + parseInt(m[2], 10);
+};
+
+// Merge saved admin overrides over the defaults, add admin-created events, and order everything by day then time.
 export const mergeEvents = (overrides = []) => {
   const byId = new Map(overrides.map((o) => [o.id, o]));
-  return EVENTS.map((e) => {
+  const finish = (e, o = {}) => {
+    const out = { ...e, dateLabel: DAY_LABELS[e.day] || "" };
+    if (o.imageVer) out.image = `/api/v1/events/${e.id}/image?v=${o.imageVer}`; // otherwise the site's built-in picture is used
+    return out;
+  };
+  const defaults = EVENTS.map((e) => {
     const o = byId.get(e.id) || {};
     const merged = { ...e };
     for (const k of EDITABLE_FIELDS) if (o[k] !== undefined) merged[k] = o[k];
-    return merged;
+    return finish(merged, o);
   });
+  const custom = overrides.filter((o) => o.custom && !DEFAULT_IDS.has(o.id)).map((o) => {
+    const merged = { id: o.id, custom: true, side: "both", visible: true, description: "", ...Object.fromEntries(EDITABLE_FIELDS.filter((k) => o[k] !== undefined).map((k) => [k, o[k]])) };
+    return finish(merged, o);
+  });
+  return [...defaults, ...custom].sort((a, b) => a.day - b.day || minutes(a.time) - minutes(b.time));
+};
+
+export const isDefaultEvent = (id) => DEFAULT_IDS.has(id);
+export const syncEventIds = (customIds) => {
+  for (const id of [...EVENT_IDS]) if (!DEFAULT_IDS.has(id)) EVENT_IDS.delete(id);
+  for (const id of customIds) EVENT_IDS.add(id);
 };
 
 // Default contact numbers shown for each side until the admin saves their own.

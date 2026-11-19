@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { EVENTS as DEFAULT_EVENTS } from "@/config/weddingDetails";
+import { DAYS, EVENTS as DEFAULT_EVENTS } from "@/config/weddingDetails";
 
+// The server list is the truth (it includes events the admin added); built-in pictures and map links fill the gaps.
+const dayLabel = (day) => DAYS.find((d) => d.day === day)?.dateLabel || "";
 const withDefaults = (list) =>
-  DEFAULT_EVENTS.map((base) => ({ side: "both", visible: true, ...base, ...(list.find((e) => e.id === base.id) || {}) }));
+  (list.length ? list : DEFAULT_EVENTS).map((e) => {
+    const base = DEFAULT_EVENTS.find((b) => b.id === e.id) || {};
+    return { side: "both", visible: true, ...base, ...e, image: e.image || base.image || null, dateLabel: dayLabel(e.day) || base.dateLabel };
+  });
 
 // Events as configured by the couple in the admin panel, falling back to the built-in defaults.
 export default function useEvents({ includeHidden = false } = {}) {

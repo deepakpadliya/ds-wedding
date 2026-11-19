@@ -17,6 +17,11 @@ export async function ensureIndexes() {
     ["gallery_video_chunks", { videoId: 1, index: 1 }, { name: "video_chunk_unique", unique: true }],
     ["admin_users", { email: 1 }, { name: "email_unique", unique: true }],
     ["login_attempts", { expiresAt: 1 }, { name: "expires_at_ttl", expireAfterSeconds: 0 }],
+    ["planner_items", { id: 1 }, { name: "planner_id_unique", unique: true }],
+    ["planner_items", { kind: 1, createdAt: 1 }, { name: "planner_kind_created" }],
+    ["planner_media", { id: 1 }, { name: "planner_media_id_unique", unique: true }],
+    ["planner_media", { itemId: 1 }, { name: "planner_media_item" }],
+    ["planner_media_chunks", { mediaId: 1, index: 1 }, { name: "planner_media_chunk_unique", unique: true }],
   ];
   for (const [col, keys, opts] of specs) {
     try { await db.collection(col).createIndex(keys, opts); }

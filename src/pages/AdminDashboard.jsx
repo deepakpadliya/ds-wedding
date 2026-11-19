@@ -8,6 +8,8 @@ import EventSettings from "@/components/admin/EventSettings";
 import ContactSettings from "@/components/admin/ContactSettings";
 import GallerySettings from "@/components/admin/GallerySettings";
 import SiteSettings from "@/components/admin/SiteSettings";
+import SidePanel from "@/components/admin/SidePanel";
+import Planner from "@/components/admin/planner/Planner";
 import { Monogram } from "@/components/Ornaments";
 
 const STATUS_BADGE = {
@@ -36,22 +38,19 @@ function GuestForm({ initial, onSave, onClose, saving }) {
       ? form.eventsAttending.filter((e) => e !== id)
       : [...form.eventsAttending, id]);
 
+  const dirty = JSON.stringify(form) !== JSON.stringify(initial);
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-maroon-deep/70 backdrop-blur-sm" onClick={onClose} />
-      <motion.div
-        data-testid="guest-edit-modal"
-        initial={{ opacity: 0, y: 30, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-ivory p-6 shadow-2xl"
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="font-display text-xl font-semibold text-maroon">Edit RSVP</h3>
-          <button data-testid="guest-edit-close" onClick={onClose} className="rounded-full p-2 text-brown/60 hover:bg-gold/10">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+    <SidePanel
+      testId="guest-edit-modal" title="Edit RSVP" subtitle={initial.guestName}
+      dirty={dirty} onClose={onClose} onSubmit={() => onSave(form)} canSubmit={!saving}
+      footer={<>
+        <button data-testid="guest-cancel-btn" onClick={onClose} className="btn-outline flex-1">Cancel</button>
+        <button data-testid="guest-save-btn" disabled={saving} onClick={() => onSave(form)} className="btn-maroon flex-[2] disabled:opacity-60">
+          {saving ? "Saving…" : "Save Changes"}
+        </button>
+      </>}
+    >
+        <div className="grid gap-4 sm:grid-cols-2">
           <label className="block sm:col-span-2">
             <span className="text-xs font-medium uppercase tracking-wider text-brown/70">Guest Name</span>
             <input data-testid="guest-edit-name" className="input-royal mt-1.5" value={form.guestName} onChange={(e) => set("guestName", e.target.value)} />
@@ -102,14 +101,7 @@ function GuestForm({ initial, onSave, onClose, saving }) {
             <textarea data-testid="guest-edit-message" className="input-royal mt-1.5 min-h-[80px]" value={form.message || ""} onChange={(e) => set("message", e.target.value)} />
           </label>
         </div>
-        <div className="mt-6 flex gap-3">
-          <button data-testid="guest-save-btn" disabled={saving} onClick={() => onSave(form)} className="btn-maroon flex-1 disabled:opacity-60">
-            {saving ? "Saving…" : "Save Changes"}
-          </button>
-          <button data-testid="guest-cancel-btn" onClick={onClose} className="btn-outline flex-1">Cancel</button>
-        </div>
-      </motion.div>
-    </div>
+    </SidePanel>
   );
 }
 
@@ -130,6 +122,13 @@ export default function AdminDashboard({ onLogout }) {
   const [deleting, setDeleting] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("admin-tab") === "site" ? "site" : "planner"; } catch { return "planner"; }
+  });
+  const switchTab = (t) => {
+    setTab(t);
+    try { localStorage.setItem("admin-tab", t); } catch { /* private mode */ }
+  };
   const timer = useRef(null);
 
   const load = useCallback(
@@ -251,7 +250,15 @@ export default function AdminDashboard({ onLogout }) {
       </header>
 
       <main className="wrap px-5 pt-8 sm:px-8">
-        {loading ? (
+        <div role="tablist" className="no-print mb-6 inline-flex rounded-full border border-gold/40 bg-white/60 p-1">
+          {[["planner", "Wedding Planner"], ["site", "RSVPs & Website"]].map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={tab === id} data-testid={`admin-tab-${id}`} onClick={() => switchTab(id)}
+              className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${tab === id ? "bg-maroon text-ivory" : "text-brown/70 hover:text-maroon"}`}>{label}</button>
+          ))}
+        </div>
+        {tab === "planner" ? (
+          <Planner />
+        ) : loading ? (
           <p className="py-24 text-center font-script text-3xl text-gold-deep">Loading the guest book…</p>
         ) : (
           <>
